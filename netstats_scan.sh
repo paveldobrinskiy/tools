@@ -53,6 +53,9 @@ for NETDIR in "${NET_DIRS[@]}"; do
   for IFACE_DIR in "$NETDIR"/*; do
     [[ -d "$IFACE_DIR/statistics" ]] || continue
     IFACE_NAME="$(basename "$IFACE_DIR")"
+    if [[ "$IFACE_NAME" == "usr" || "$IFACE_NAME" == "lo" ]]; then
+        continue
+    fi
 
      # Try to detect underlying infiniband device name
      DEV_NAME=""
@@ -76,8 +79,8 @@ for NETDIR in "${NET_DIRS[@]}"; do
     RX_DROP="$(read_stat "$IFACE_DIR/statistics/rx_dropped")"
     TX_DROP="$(read_stat "$IFACE_DIR/statistics/tx_dropped")"
 
-    RX_TB="$(awk -v b="$RX_BYTES" 'BEGIN{printf "%.3f", (b/1e12)}')"
-    TX_TB="$(awk -v b="$TX_BYTES" 'BEGIN{printf "%.3f", (b/1e12)}')"
+    RX_TB="$(awk -v b="$RX_BYTES" 'BEGIN{printf "%.1f", (b/1e12)}')"
+    TX_TB="$(awk -v b="$TX_BYTES" 'BEGIN{printf "%.1f", (b/1e12)}')"
 
     if (( RX_PKTS > 0 )); then
       AVG_RX=$(( RX_BYTES / RX_PKTS ))
@@ -90,8 +93,10 @@ for NETDIR in "${NET_DIRS[@]}"; do
       AVG_TX=0
     fi
     REL_PATH="${NETDIR#$ROOT/}"
+    HOSTN="$(awk '{print $4; exit}' "$NETDIR"/../../../../../var/log/messages)"
+    #HOSTN="$(ls -la "$NETDIR"/../../../../..)"
     REL_PATH="${REL_PATH%/sys/class/net}"
-    echo "$REL_PATH $IFACE_LABEL RX=${RX_TB}TB TX=${TX_TB}TB RX_pkts=$RX_PKTS TX_pkts=$TX_PKTS AvgRxPkt=${AVG_RX}B AvgTxPkt=${AVG_TX}B rx_errs=$RX_ERRS tx_errs=$TX_ERRS rx_drop=$RX_DROP tx_drop=$TX_DROP"
+    echo "$HOSTN $IFACE_LABEL RX=${RX_TB}TB TX=${TX_TB}TB RX_pkts=$RX_PKTS TX_pkts=$TX_PKTS AvgRxPkt=${AVG_RX}B AvgTxPkt=${AVG_TX}B rx_errs=$RX_ERRS tx_errs=$TX_ERRS rx_drop=$RX_DROP tx_drop=$TX_DROP"
     #echo "$REL_PATH $IFACE_NAME RX=${RX_TB}TB TX=${TX_TB}TB RX_pkts=$RX_PKTS TX_pkts=$TX_PKTS AvgRxPkt=${AVG_RX}B AvgTxPkt=${AVG_TX}B rx_errs=$RX_ERRS tx_errs=$TX_ERRS rx_drop=$RX_DROP tx_drop=$TX_DROP"
   done
 done
