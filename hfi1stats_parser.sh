@@ -42,6 +42,7 @@ convert_value() {
 while read -r metric numunit; do
     # match lines like "MetricName   12345K"
     if [[ "$metric" =~ ^[A-Za-z0-9_.:/-]+$ ]] && [[ "$numunit" =~ ^([0-9]+)([KMGTP]?)$ ]]; then
+        echo "$metric $numunit"
         num="${BASH_REMATCH[1]}"
         unit="${BASH_REMATCH[2]}"
         value=$(convert_value "$num" "$unit")
