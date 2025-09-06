@@ -2,7 +2,9 @@
 
 # OPA, OPX, ETH, IB traffic counter
 # by default it looks for MLX5
-# Pavel Dobrinskiy pdobrinskiy@cornelisnetworeks.com
+# Pavel Dobrinskiy pdobrinskiy@cornelisnetworks.com
+# OPX_PORT_BLOCK, IB_DEVICE, IB_LID, ETH_IFACE could be set from env variables
+# not testted in mixed OPA100, CN5000
 #example
 #[root@opahsx174 ~]# python link_delta.py 
 #OPA100 Port0,1 RX: current=0.0109 GiB, delta=0.0000 GiB
@@ -13,7 +15,7 @@
 #ETH eth0 RX: current=20.0840 GiB, delta=2.1044 GiB
 #ETH eth0 TX: current=1.1474 GiB, delta=0.0834 GiB
 #
-
+# data is saved to ~/.link_counters.json
 
 
 import json, os, re, subprocess, sys
