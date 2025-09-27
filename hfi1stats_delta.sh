@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
-# Autor: Pavel Dobrinskiy pdobrinskiy@cornelisnetworks.com
-# Save hfi1stats to JSON  print filtered, non-zero deltas (desc).
+# Author: Pavel Dobrinskiy
+# Purpose: Save hfi1stats to a single CSV history file and print filtered, non-zero deltas (desc).
 # Default filter: (DcRcvBbl|TxWait|TxFlowStall|Flit)
-# for OPA100
 # Usage:
 #   ./hfi1stats_delta.sh
-#   ./hfi1stats_delta.sh --filter '^Port.*\.(TxPkt|RxPkt)$'   # override filter
-#   ./hfi1stats_delta.sh --cmd "hfi1stats -v"                 # custom command
+#   ./hfi1stats_delta.sh --filter '^Port.*\.(TxPkt|RxPkt)$'
+#   ./hfi1stats_delta_.sh --cmd "hfi1stats -v"
 
 set -euo pipefail
 
 HFI_CMD="hfi1stats"
 HOSTNAME_SHORT="$(hostname -s 2>/dev/null || hostname)"
 STATE_DIR="/var/tmp"
-STATE_FILE="${STATE_DIR}/hfi1stats_${HOSTNAME_SHORT}.json"
+HIST_FILE="${STATE_DIR}/hfi1stats_${HOSTNAME_SHORT}.csv"
 
-# Default filter (configurable)
 DEFAULT_FILTER='(DcRcvBbl|TxWait|TxFlowStall|Flit)'
 FILTER_REGEX="$DEFAULT_FILTER"
 
@@ -28,10 +26,9 @@ while [[ $# -gt 0 ]]; do
 Usage: $0 [--filter "<regex>"] [-c|--cmd "<hfi1stats command>"]
   --filter "<regex>"  Only show keys matching this regex (default: $DEFAULT_FILTER)
   -c, --cmd "<cmd>"   Command to run instead of 'hfi1stats'
-State file: ${STATE_FILE}
+History file: ${HIST_FILE}
 EOF
-      exit 0
-      ;;
+      exit 0 ;;
     *) echo "Unknown arg: $1" >&2; exit 1 ;;
   esac
 done
@@ -40,7 +37,7 @@ RAW_OUT="$($HFI_CMD 2>/dev/null || true)"
 [[ -z "$RAW_OUT" ]] && { echo "Error: no output from command: $HFI_CMD" >&2; exit 1; }
 NOW_TS="$(date -Iseconds)"
 
-# Parse to "section.key|valueToken" lines (handles multi-word names & K/M/G)
+# Parse to "section.key|valueToken"
 PARSED_LINES="$(
   awk '
     function trim(s){ sub(/^ +/, "", s); sub(/ +$/, "", s); return s }
@@ -88,22 +85,25 @@ while IFS="|" read k v; do
   curr["$k"]="$(normalize "$v")"
 done <<< "$PARSED_LINES"
 
-# Load previous snapshot if present
-PREV_TS=""
-if [[ -s "$STATE_FILE" ]]; then
-  PREV_TS="$(sed -n 's/.*"timestamp"[[:space:]]*:[[:space:]]*"\(.*\)".*/\1/p' "$STATE_FILE" | head -n1 || true)"
-  in_data=0
-  while IFS= read -r line; do
-    [[ "$line" =~ \"data\"[[:space:]]*:\ *\{ ]] && { in_data=1; continue; }
-    [[ $in_data -eq 1 && "$line" =~ \} ]] && { in_data=0; continue; }
-    if [[ $in_data -eq 1 && "$line" =~ \"(.*)\"[[:space:]]*:[[:space:]]*([0-9]+) ]]; then
-      k="${BASH_REMATCH[1]}"; v="${BASH_REMATCH[2]}"; prev["$k"]="$v"
-    fi
-  done < "$STATE_FILE"
+mkdir -p "$STATE_DIR"
+# Initialize history file with header if new
+if [[ ! -s "$HIST_FILE" ]]; then
+  echo "timestamp,key,value" > "$HIST_FILE"
 fi
 
-# Print timestamps and filtered non-zero deltas
-if [[ -n "$PREV_TS" ]]; then
+# Find the previous timestamp (from the last data row)
+PREV_TS="$(tail -n +2 "$HIST_FILE" | tail -n 1 | cut -d, -f1 || true)"
+
+# Load previous snapshot map (only rows with PREV_TS)
+if [[ -n "${PREV_TS}" ]]; then
+  while IFS=, read -r ts key val; do
+    [[ "$ts" != "$PREV_TS" ]] && continue
+    prev["$key"]="$val"
+  done < "$HIST_FILE"
+fi
+
+# Print deltas
+if [[ -n "${PREV_TS}" ]]; then
   echo "Previous run: $PREV_TS"
   echo "Current  run: $NOW_TS"
   echo
@@ -127,29 +127,16 @@ if [[ -n "$PREV_TS" ]]; then
   rm -f "$TMP_OUT"
   echo
 else
-  echo "No previous state found. Creating initial snapshot."
+  echo "No previous snapshot in history. Creating initial entry."
   echo "Current run: $NOW_TS"
   echo
 fi
 
-# Save current snapshot as JSON
-mkdir -p "$STATE_DIR"
-{
-  echo "{"
-  echo "  \"timestamp\": \"${NOW_TS}\","
-  echo "  \"data\": {"
-  first=1
-  for key in "${!curr[@]}"; do
-    esc="${key//\\/\\\\}"; esc="${esc//\"/\\\"}"
-    val="${curr[$key]}"
-    if [[ $first -eq 1 ]]; then
-      printf '    "%s": %s\n' "$esc" "$val"; first=0
-    else
-      printf '    ,"%s": %s\n' "$esc" "$val"
-    fi
-  done
-  echo "  }"
-  echo "}"
-} > "$STATE_FILE"
+# Append current snapshot to history CSV (one row per key)
+# Keys should not contain commas; if they might, replace commas.
+for key in "${!curr[@]}"; do
+  clean_key="${key//,/;}"
+  echo "${NOW_TS},${clean_key},${curr[$key]}" >> "$HIST_FILE"
+done
 
-echo "State saved to: $STATE_FILE"
+echo "Appended snapshot to history: $HIST_FILE"
