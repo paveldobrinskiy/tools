@@ -5,6 +5,7 @@
 # Pavel Dobrinskiy pdobrinskiy@cornelisnetworks.com
 # OPX_PORT_BLOCK, IB_DEVICE, IB_LID, ETH_IFACE could be set from env variables
 # not testted in mixed OPA100, CN5000
+# v3 cn5000 or opa100 compatible
 #example
 #[root@opahsx174 ~]# python link_delta.py 
 #OPA100 Port0,1 RX: current=0.0109 GiB, delta=0.0000 GiB
@@ -16,7 +17,12 @@
 #ETH eth0 TX: current=1.1474 GiB, delta=0.0834 GiB
 #
 # data is saved to ~/.link_counters.json
-
+#or
+#[root@cn5kGenoa163 ~]# python3 link_delta.py
+#CN5000-100Gb Port0,2 RX: current=648.5699 GiB, delta=0.1608 GiB
+#CN5000-100Gb Port0,2 TX: current=1754.3684 GiB, delta=322.5247 GiB
+#ETH eth0 RX: current=0.3428 GiB, delta=0.0000 GiB
+#ETH eth0 TX: current=0.0296 GiB, delta=0.0000 GiB
 
 import json, os, re, subprocess, sys
 from pathlib import Path
