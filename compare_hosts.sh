@@ -37,6 +37,10 @@ ssh "$HOST2" "/root/updateAgent -V 2>/dev/null || echo 'N/A'" > "$TMPDIR/fw2.txt
 ssh "$HOST1" "cat /etc/modprobe.d/hfi1.conf 2>/dev/null || echo 'missing'" > "$TMPDIR/conf1.txt"
 ssh "$HOST2" "cat /etc/modprobe.d/hfi1.conf 2>/dev/null || echo 'missing'" > "$TMPDIR/conf2.txt"
 
+# --- hfi1.module ---
+ssh "$HOST1" "modinfo hfi1 | head -2  2>/dev/null || echo 'missing'" > "$TMPDIR/mod1.txt"
+ssh "$HOST2" "modinfo hfi1 | head -2 2>/dev/null || echo 'missing'" > "$TMPDIR/mod2.txt"
+
 # --- Packages (filtered) ---
 # For RPM distros: output lines like name-version-release.arch
 # For dpkg systems: output lines like name-version
@@ -65,6 +69,10 @@ paste <(echo "$HOST1:"; cat "$TMPDIR/fw1.txt") <(echo "$HOST2:"; cat "$TMPDIR/fw
 echo
 echo "===== /etc/modprobe.d/hfi1.conf (diff) ====="
 diff -u "$TMPDIR/conf1.txt" "$TMPDIR/conf2.txt" || true
+
+echo
+echo "===== modinfo hfi1 (diff) ====="
+diff -u "$TMPDIR/mod1.txt" "$TMPDIR/mod2.txt" || true
 
 echo
 echo "===== Selected Package Differences (only: opa|opx|cna|cn5000|hfi) ====="
